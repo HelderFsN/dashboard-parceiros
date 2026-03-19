@@ -41,11 +41,26 @@ def get_phase(row):
 
 df['Fase'] = df.apply(get_phase, axis=1)
 
+def get_etapa_atual(row):
+    if pd.notnull(row['Fim Homologação']):
+        return "Concluído"
+    elif pd.notnull(row['Assinatura Contrato']):
+        return "Homologação" 
+    elif pd.notnull(row['Início Homologação']):
+        return "Assinatura de Contrato"
+    elif pd.notnull(row['Entrevista']):
+        return "Aguardando Homologação"
+    elif pd.notnull(row['Primeiro Contato']):
+        return "Entrevista"
+    return "Não Iniciado"
+
+df['Etapa Atual'] = df.apply(get_etapa_atual, axis=1)
+
 # Lógica de "Situação" para a tabela (ATRASADO)
 hoje = pd.to_datetime(datetime.today().date())
 def get_situation(row):
-    # Se já foi homologado, ok
-    if row['Fase'] == 'Homologado':
+    # Se já foi homologado / fim da homologação preenchido, ok
+    if pd.notnull(row['Fim Homologação']):
         return 'CONCLUÍDO'
     
     # Podemos conferir SLA ou estimar um atraso (exemplo 30 dias após primeiro contato)
@@ -124,33 +139,44 @@ select_parceiro = st.sidebar.selectbox("Parceiro", parceiros)
 if select_parceiro != 'Todos':
     df_filtered = df_filtered[df_filtered['Parceiros'] == select_parceiro]
 
-# Cálculos para os cartões (Média de dias)
-metric1 = (df_filtered['Entrevista'] - df_filtered['Primeiro Contato']).dt.days.mean()
-metric2 = (df_filtered['Assinatura Contrato'] - df_filtered['Início Homologação']).dt.days.mean()
-metric3 = (df_filtered['Fim Homologação'] - df_filtered['Início Homologação']).dt.days.mean()
-metric4 = (df_filtered['Fim Homologação'] - df_filtered['Primeiro Contato']).dt.days.mean()
+# Preparar dados numéricos temporais para os gráficos
+df_charts = df_filtered[['Parceiros']].copy()
+def calc_dias_num(start, end):
+    hoje = pd.to_datetime(datetime.today().date())
+    if pd.isnull(start) and pd.isnull(end): return None
+    if pd.notnull(start) and pd.isnull(end): return (hoje - start).days
+    if pd.isnull(start) and pd.notnull(end): return None
+    return (end - start).days
 
-def format_days(val):
-    if pd.isna(val):
-        return "Sem dados"
-    if select_parceiro != 'Todos':
-        return f"{int(val)} dias"
-    return f"{int(val)} dias médios"
+if not df_filtered.empty:
+    df_charts['T_Entrevista'] = df_filtered.apply(lambda r: calc_dias_num(r['Primeiro Contato'], r['Entrevista']), axis=1)
+    df_charts['T_Contrato'] = df_filtered.apply(lambda r: calc_dias_num(r['Início Homologação'], r['Assinatura Contrato']), axis=1)
+    df_charts['T_Homolog'] = df_filtered.apply(lambda r: calc_dias_num(r['Início Homologação'], r['Fim Homologação']), axis=1)
+    df_charts['T_Total'] = df_filtered.apply(lambda r: calc_dias_num(r['Primeiro Contato'], r['Fim Homologação']), axis=1)
 
 # Construindo as colunas principais
-col_left, col_right = st.columns([1, 1.5])
+col_left, col_right = st.columns([1.5, 1])
 
 with col_left:
     st.markdown("### Tabela de Parceiros")
     
     # Preparar df para exibição
-    df_exibir = df_filtered[['Parceiros', 'Situação']].copy()
+    df_exibir = df_filtered[['Parceiros', 'Etapa Atual', 'Situação']].copy()
     
-    # Estilização condicional do Pandas para vermelho em ATRASADO
+    # Estilização condicional do Pandas
     def color_status(val):
-        color = '#ff4b4b' if val == 'ATRASADO' else 'transparent'
-        font_weight = 'bold' if val == 'ATRASADO' else 'normal'
-        text_color = 'white' if val == 'ATRASADO' else 'inherit'
+        if val == 'ATRASADO':
+            color = '#ff4b4b'
+            font_weight = 'bold' 
+            text_color = 'white'
+        elif val == 'CONCLUÍDO':
+            color = '#00cc66'
+            font_weight = 'bold'
+            text_color = 'white'
+        else:
+            color = 'transparent'
+            font_weight = 'normal'
+            text_color = 'inherit'
         return f'background-color: {color}; color: {text_color}; font-weight: {font_weight}'
 
     st.dataframe(
@@ -159,7 +185,8 @@ with col_left:
         use_container_width=True,
         height=350
     )
-    
+
+with col_right:
     st.markdown("### Distribuição das Fases")
     # Gráfico de Pizza com Altair
     fases_count = df_filtered['Fase'].value_counts().reset_index()
@@ -168,44 +195,71 @@ with col_left:
     if not fases_count.empty:
         chart = alt.Chart(fases_count).mark_arc(innerRadius=0).encode(
             theta=alt.Theta(field="Contagem", type="quantitative"),
-            color=alt.Color(field="Fase", type="nominal", legend=alt.Legend(title="Fase", orient="right")),
+            color=alt.Color(field="Fase", type="nominal", legend=alt.Legend(title="Fase", orient="bottom")),
             tooltip=['Fase', 'Contagem']
-        ).properties(height=300)
+        ).properties(height=350)
         
         st.altair_chart(chart, use_container_width=True)
     else:
         st.write("Sem dados para o gráfico")
 
-with col_right:
-    st.markdown("### Métricas de Tempo")
-    
-    c1, c2 = st.columns(2)
-    
-    with c1:
-        st.markdown(f'<div class="metric-card"><div class="metric-title">Tempo para Iniciar entrevista</div>'
-                    f'<div class="metric-value">{format_days(metric1)}</div></div>', unsafe_allow_html=True)
-                    
-        st.markdown(f'<div class="metric-card"><div class="metric-title">Período de Homologação</div>'
-                    f'<div class="metric-value">{format_days(metric3)}</div></div>', unsafe_allow_html=True)
+st.markdown("---")
+st.markdown("### Métricas por Parceiro (Dias)")
 
-    with c2:
-        st.markdown(f'<div class="metric-card"><div class="metric-title">Tempo para assinar o contrato</div>'
-                    f'<div class="metric-value">{format_days(metric2)}</div></div>', unsafe_allow_html=True)
-                    
-        st.markdown(f'<div class="metric-card"><div class="metric-title">Tempo de todo processo</div>'
-                    f'<div class="metric-value">{format_days(metric4)}</div></div>', unsafe_allow_html=True)
+def plot_bar(col_id, title, color):
+    if df_filtered.empty or col_id not in df_charts.columns:
+        st.info(f"Sem dados para: {title}")
+        return
     
-    st.markdown("---")
-    st.markdown("Os *Tempos* das métricas acima representam **a média em dias** de todos os parceiros filtrados.")
+    data = df_charts[['Parceiros', col_id]].dropna()
+    if data.empty:
+        st.info(f"Sem dados para: {title}")
+        return
+        
+    chart = alt.Chart(data).mark_bar(color=color, cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+        x=alt.X('Parceiros:N', sort='-y', title=None, axis=alt.Axis(labelAngle=-45)),
+        y=alt.Y(f'{col_id}:Q', title='Dias'),
+        tooltip=['Parceiros', alt.Tooltip(f'{col_id}:Q', title='Dias')]
+    ).properties(title=title, height=220)
+    st.altair_chart(chart, use_container_width=True)
+
+plot_bar('T_Entrevista', 'Tempo para iniciar entrevista', '#0076cf')
+plot_bar('T_Contrato', 'Tempo para assinar o contrato', '#00cc66')
+plot_bar('T_Homolog', 'Período de Homologação', '#ff9900')
+plot_bar('T_Total', 'Tempo de todo processo', '#8a2be2')
 
 st.markdown("---")
 st.subheader("⏱️ Detalhamento de Tempo por Parceiro (em dias)")
 
-# Calcular tempos individuais (em dias) mantendo vazio o que não tiver data
+# Calcular tempos individuais (em dias) com condicional de "Pendente" usando o dia atual
 df_detalhe = df_filtered[['Parceiros', 'Fase', 'Situação']].copy()
-df_detalhe['Tempo Iníciar Entrevista'] = (df_filtered['Entrevista'] - df_filtered['Primeiro Contato']).dt.days.astype('Int64')
-df_detalhe['Tempo Assinar Contrato'] = (df_filtered['Assinatura Contrato'] - df_filtered['Início Homologação']).dt.days.astype('Int64')
-df_detalhe['Período de Homologação'] = (df_filtered['Fim Homologação'] - df_filtered['Início Homologação']).dt.days.astype('Int64')
-df_detalhe['Tempo de todo processo'] = (df_filtered['Fim Homologação'] - df_filtered['Primeiro Contato']).dt.days.astype('Int64')
+
+def calc_detalhes_row(row):
+    hoje = pd.to_datetime(datetime.today().date())
+    
+    def calc_tempo(start, end):
+        if pd.isnull(start) and pd.isnull(end):
+            return "Pendente"
+        elif pd.notnull(start) and pd.isnull(end):
+            return f"{(hoje - start).days} dias (Pendente)"
+        elif pd.isnull(start) and pd.notnull(end):
+            return "Pendente"
+        else:
+            return f"{(end - start).days} dias"
+            
+    return pd.Series({
+        'Etapa Atual': row['Etapa Atual'],
+        'Entrevista': calc_tempo(row['Primeiro Contato'], row['Entrevista']),
+        'Assinatura de Contrato': calc_tempo(row['Início Homologação'], row['Assinatura Contrato']),
+        'Homologação': calc_tempo(row['Início Homologação'], row['Fim Homologação']),
+        'Todo Processo': calc_tempo(row['Primeiro Contato'], row['Fim Homologação'])
+    })
+
+if not df_filtered.empty:
+    novas_colunas = df_filtered.apply(calc_detalhes_row, axis=1)
+    df_detalhe = pd.concat([df_detalhe, novas_colunas], axis=1)
+else:
+    for col in ['Etapa Atual', 'Entrevista', 'Assinatura de Contrato', 'Homologação', 'Todo Processo']:
+        df_detalhe[col] = pd.Series(dtype='object')
 
 st.dataframe(df_detalhe, hide_index=True, use_container_width=True)
