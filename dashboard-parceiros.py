@@ -141,18 +141,20 @@ if select_parceiro != 'Todos':
 
 # Preparar dados numéricos temporais para os gráficos
 df_charts = df_filtered[['Parceiros']].copy()
-def calc_dias_num(start, end):
+def calc_dias_num(start, end, block_pending=False):
     hoje = pd.to_datetime(datetime.today().date())
     if pd.isnull(start) and pd.isnull(end): return None
-    if pd.notnull(start) and pd.isnull(end): return (hoje - start).days
+    if pd.notnull(start) and pd.isnull(end):
+        if block_pending: return None
+        return (hoje - start).days
     if pd.isnull(start) and pd.notnull(end): return None
     return (end - start).days
 
 if not df_filtered.empty:
     df_charts['T_Entrevista'] = df_filtered.apply(lambda r: calc_dias_num(r['Primeiro Contato'], r['Entrevista']), axis=1)
-    df_charts['T_Contrato'] = df_filtered.apply(lambda r: calc_dias_num(r['Início Homologação'], r['Assinatura Contrato']), axis=1)
-    df_charts['T_Homolog'] = df_filtered.apply(lambda r: calc_dias_num(r['Início Homologação'], r['Fim Homologação']), axis=1)
-    df_charts['T_Total'] = df_filtered.apply(lambda r: calc_dias_num(r['Primeiro Contato'], r['Fim Homologação']), axis=1)
+    df_charts['T_Contrato'] = df_filtered.apply(lambda r: calc_dias_num(r['Início Homologação'], r['Assinatura Contrato'], block_pending=pd.isnull(r['Entrevista'])), axis=1)
+    df_charts['T_Homolog'] = df_filtered.apply(lambda r: calc_dias_num(r['Início Homologação'], r['Fim Homologação'], block_pending=pd.isnull(r['Assinatura Contrato'])), axis=1)
+    df_charts['T_Total'] = df_filtered.apply(lambda r: calc_dias_num(r['Primeiro Contato'], r['Fim Homologação'], block_pending=True), axis=1)
 
 # Construindo as colunas principais
 col_left, col_right = st.columns([1.5, 1])
@@ -237,22 +239,23 @@ df_detalhe = df_filtered[['Parceiros', 'Fase', 'Situação']].copy()
 def calc_detalhes_row(row):
     hoje = pd.to_datetime(datetime.today().date())
     
-    def calc_tempo(start, end):
+    def calc_tempo(start, end, block_pending=False):
         if pd.isnull(start) and pd.isnull(end):
-            return "Pendente"
+            return "-"
         elif pd.notnull(start) and pd.isnull(end):
+            if block_pending: return "-"
             return f"{(hoje - start).days} dias (Pendente)"
         elif pd.isnull(start) and pd.notnull(end):
-            return "Pendente"
+            return "-"
         else:
             return f"{(end - start).days} dias"
             
     return pd.Series({
         'Etapa Atual': row['Etapa Atual'],
         'Entrevista': calc_tempo(row['Primeiro Contato'], row['Entrevista']),
-        'Assinatura de Contrato': calc_tempo(row['Início Homologação'], row['Assinatura Contrato']),
-        'Homologação': calc_tempo(row['Início Homologação'], row['Fim Homologação']),
-        'Todo Processo': calc_tempo(row['Primeiro Contato'], row['Fim Homologação'])
+        'Assinatura de Contrato': calc_tempo(row['Início Homologação'], row['Assinatura Contrato'], block_pending=pd.isnull(row['Entrevista'])),
+        'Homologação': calc_tempo(row['Início Homologação'], row['Fim Homologação'], block_pending=pd.isnull(row['Assinatura Contrato'])),
+        'Todo Processo': calc_tempo(row['Primeiro Contato'], row['Fim Homologação'], block_pending=True)
     })
 
 if not df_filtered.empty:
