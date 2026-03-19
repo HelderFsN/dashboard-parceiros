@@ -36,7 +36,7 @@ def get_phase(row):
     if pd.notnull(row['Entrevista']):
         return "Em Análise"
     if pd.notnull(row['Primeiro Contato']):
-        return "Parceiro - documentação..."
+        return "Parceiro - documentação"
     return "Sem Contato"
 
 df['Fase'] = df.apply(get_phase, axis=1)
@@ -201,11 +201,23 @@ with col_right:
     fases_count.columns = ['Fase', 'Contagem']
     
     if not fases_count.empty:
+        # Cria rótulo com a quantidade apenas para a legenda
+        fases_count['Fase + Total'] = fases_count.apply(lambda x: f"{x['Fase']} ({x['Contagem']})", axis=1)
+        
         chart = alt.Chart(fases_count).mark_arc(innerRadius=0).encode(
             theta=alt.Theta(field="Contagem", type="quantitative"),
-            color=alt.Color(field="Fase", type="nominal", legend=alt.Legend(title="Fase", orient="bottom")),
+            color=alt.Color(
+                field="Fase + Total", 
+                type="nominal", 
+                legend=alt.Legend(
+                    title="Fase (Total)", 
+                    orient="bottom", 
+                    columns=2, 
+                    labelLimit=0
+                )
+            ),
             tooltip=['Fase', 'Contagem']
-        ).properties(height=350)
+        ).properties(height=380)
         
         st.altair_chart(chart, use_container_width=True)
     else:
