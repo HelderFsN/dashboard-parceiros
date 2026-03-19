@@ -133,6 +133,8 @@ metric4 = (df_filtered['Fim Homologação'] - df_filtered['Primeiro Contato']).d
 def format_days(val):
     if pd.isna(val):
         return "Sem dados"
+    if select_parceiro != 'Todos':
+        return f"{int(val)} dias"
     return f"{int(val)} dias médios"
 
 # Construindo as colunas principais
