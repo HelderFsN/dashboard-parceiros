@@ -98,6 +98,12 @@ st.markdown("""
 # Filtros laterais
 st.sidebar.title("Filtros")
 
+if st.sidebar.button("🔄 Atualizar Dados"):
+    load_data.clear()
+    st.rerun()
+
+st.sidebar.markdown("---")
+
 estados = ['Todos'] + sorted(df['Estado'].dropna().unique().tolist())
 select_estado = st.sidebar.selectbox("Estado", estados)
 
@@ -188,7 +194,7 @@ with col_right:
                     f'<div class="metric-value">{format_days(metric4)}</div></div>', unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown("Os *Tempos (SLA)* das métricas acima representam **a média em dias** de todos os parceiros filtrados. Se apenas um Parceiro for selecionado, você verá o tempo individual nato dessa empresa.")
+    st.markdown("Os *Tempos* das métricas acima representam **a média em dias** de todos os parceiros filtrados.")
 
 st.markdown("---")
 st.subheader("⏱️ Detalhamento de Tempo por Parceiro (em dias)")

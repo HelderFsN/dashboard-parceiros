@@ -63,9 +63,11 @@ df_ad = get_df_by_id(data['aditamentos'], c_id)
 df_pg = get_df_by_id(data['pagamentos'], c_id)
 
 # Variáveis globais base para preenchimento
-objeto = ct_row.get('DESCRIÇÃO_DO_OBJETO', '-')
-regional = ct_row.get('REGIONAL_MUNICÍPIO', 'CAPITAL/INTERIOR')
+objeto = ct_row.get('OBJETO', '-')
+regional = ct_row.get('LOCAL OU REGIÃO DE ABRANGÊNCIA', 'CAPITAL/INTERIOR')
 status_geral = ct_row.get('STATUS_GERAL', 'NÃO VIGENTE')
+fiscal_nome = ct_row.get('FISCAL', 'Suely de Fátima Facenda Kusaba')
+if pd.isna(fiscal_nome) or str(fiscal_nome) == 'nan': fiscal_nome = '-'
 
 nm_fantasia = "EMPRESA NÃO ENCONTRADA"
 rz_social = "-"
@@ -244,7 +246,7 @@ html_content = html_style + f"""
     <div class="main-title">ACOMPANHAMENTO E CONTROLE DE CONTRATOS</div>
     <div class="sub-title">CSOP | DSEG</div>
     
-    <div class="fiscal-title">Fiscal: Suely de Fátima Facenda Kusaba</div>
+    <div class="fiscal-title">Fiscal: {fiscal_nome}</div>
     
     <div class="blue-bar">
         <span>Serviços Contratados</span>
@@ -317,6 +319,24 @@ html_content += """
     </table>
 """
 
+# --- Cálculos Reais de Prazos ---
+if not df_ad.empty:
+    vig_ini = pd.to_datetime(df_ad.get('INÍCIO_VIGÊNCIA', pd.Series(dtype='datetime64[ns]'))).min()
+    vig_ter = pd.to_datetime(df_ad.get('TÉRMINO_VIGÊNCIA', pd.Series(dtype='datetime64[ns]'))).max()
+    exe_ini = pd.to_datetime(df_ad.get('INÍCIO_EXECUÇÃO', pd.Series(dtype='datetime64[ns]'))).min()
+    exe_ter = pd.to_datetime(df_ad.get('TÉRMINO_EXECUÇÃO', pd.Series(dtype='datetime64[ns]'))).max()
+    
+    # Obs baseada na quantidade de aditivos (Termo Aditivo)
+    termos_list = df_ad.get('TERMO_TIPO', pd.Series(dtype='str')).fillna('').tolist()
+    aditivos = [t for t in termos_list if 'Aditivo' in str(t)]
+    obs_vig = f"Após {len(aditivos)}º Termo Aditivo" if len(aditivos) > 0 else "-"
+else:
+    vig_ini, vig_ter, exe_ini, exe_ter = pd.NaT, pd.NaT, pd.NaT, pd.NaT
+    obs_vig = "-"
+
+def format_date(d):
+    return d.strftime('%d/%m/%Y') if not pd.isna(d) else '-'
+
 # Prazos and Valores 
 html_content += f"""
     <div class="blue-bar">
@@ -326,15 +346,15 @@ html_content += f"""
     <table class="no-border border-b" style="margin-top:5px;">
         <tr>
             <td style="width:30%; font-weight:bold;">Prazo de Execução</td>
-            <td style="width:20%;"><span class="small-lbl">Início</span>-</td>
-            <td style="width:20%;"><span class="small-lbl">Término</span>-</td>
-            <td style="width:30%;"><span class="small-lbl">Obs.:</span> </td>
+            <td style="width:20%;"><span class="small-lbl">Início</span>{format_date(exe_ini)}</td>
+            <td style="width:20%;"><span class="small-lbl">Término</span>{format_date(exe_ter)}</td>
+            <td style="width:30%;"><span class="small-lbl">Obs.:</span>-</td>
         </tr>
         <tr>
             <td style="font-weight:bold;">Prazo de Vigência</td>
-            <td><span class="small-lbl">Início</span>-</td>
-            <td><span class="small-lbl">Término</span>-</td>
-            <td><span class="small-lbl">Obs.:</span>Após xº Termo Aditivo</td>
+            <td><span class="small-lbl">Início</span>{format_date(vig_ini)}</td>
+            <td><span class="small-lbl">Término</span>{format_date(vig_ter)}</td>
+            <td><span class="small-lbl">Obs.:</span>{obs_vig}</td>
         </tr>
     </table>
 
