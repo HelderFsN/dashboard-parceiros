@@ -127,17 +127,17 @@ if select_estado != 'Todos':
 else:
     df_filtered = df.copy()
 
-fases = ['Todas'] + sorted(df_filtered['Fase'].dropna().unique().tolist())
-select_fase = st.sidebar.selectbox("Fase", fases)
+fases = sorted(df_filtered['Fase'].dropna().unique().tolist())
+select_fase = st.sidebar.multiselect("Fase (vazio = Todas)", options=fases, default=[])
 
-if select_fase != 'Todas':
-    df_filtered = df_filtered[df_filtered['Fase'] == select_fase]
+if select_fase:
+    df_filtered = df_filtered[df_filtered['Fase'].isin(select_fase)]
 
-etapas = ['Todas'] + sorted(df_filtered['Etapa Atual'].dropna().unique().tolist())
-select_etapa = st.sidebar.selectbox("Etapa Atual", etapas)
+etapas = sorted(df_filtered['Etapa Atual'].dropna().unique().tolist())
+select_etapa = st.sidebar.multiselect("Etapa Atual (vazio = Todas)", options=etapas, default=[])
 
-if select_etapa != 'Todas':
-    df_filtered = df_filtered[df_filtered['Etapa Atual'] == select_etapa]
+if select_etapa:
+    df_filtered = df_filtered[df_filtered['Etapa Atual'].isin(select_etapa)]
 
 parceiros = ['Todos'] + sorted(df_filtered['Parceiros'].dropna().unique().tolist())
 select_parceiro = st.sidebar.selectbox("Parceiro", parceiros)
