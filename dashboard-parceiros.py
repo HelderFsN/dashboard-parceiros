@@ -133,6 +133,12 @@ select_fase = st.sidebar.selectbox("Fase", fases)
 if select_fase != 'Todas':
     df_filtered = df_filtered[df_filtered['Fase'] == select_fase]
 
+etapas = ['Todas'] + sorted(df_filtered['Etapa Atual'].dropna().unique().tolist())
+select_etapa = st.sidebar.selectbox("Etapa Atual", etapas)
+
+if select_etapa != 'Todas':
+    df_filtered = df_filtered[df_filtered['Etapa Atual'] == select_etapa]
+
 parceiros = ['Todos'] + sorted(df_filtered['Parceiros'].dropna().unique().tolist())
 select_parceiro = st.sidebar.selectbox("Parceiro", parceiros)
 
