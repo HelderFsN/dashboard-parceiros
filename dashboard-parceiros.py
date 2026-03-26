@@ -13,11 +13,11 @@ def load_data():
     sheet_id = "1ncUO3qsAr8edPs3Cee_H4kFcwvZc4yTGV1tlVq5zXV8"
     
     # URL da Aba 1 (Datas e SLA) - Geralmente gid=0
-    url_p1 = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0"
+    url_p1 = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=651550249"
     # URL da Aba 2 (O que aparece no seu print: Parceiros, UF, Status)
     # Nota: Você precisa verificar o número do GID na barra de endereços do navegador ao clicar na Página2
     # Vou usar o padrão '1452934057' como exemplo, mas substitua pelo GID correto da aba Página2
-    url_p2 = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=651550249"
+    url_p2 = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=452225427"
 
     # Lendo as duas abas
     df1 = pd.read_csv(url_p1)
