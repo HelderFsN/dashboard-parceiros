@@ -5,41 +5,53 @@ from datetime import datetime
 import numpy as np
 
 # Configurar layout da página
-st.set_page_config(layout="wide", page_title="Dashboard de Parceiros")
+st.set_page_config(layout="wide", page_title="Dashboard de Parceiros Integrado")
 
 @st.cache_data
 def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1ncUO3qsAr8edPs3Cee_H4kFcwvZc4yTGV1tlVq5zXV8/export?format=csv"
-    df = pd.read_csv(url)
-    # Renomear colunas para evitar problemas de codificação
-    df.columns = [
-        'Parceiros', 'Estado', 'Primeiro Contato', 'Entrevista', 
+    # ID da Planilha
+    sheet_id = "1ncUO3qsAr8edPs3Cee_H4kFcwvZc4yTGV1tlVq5zXV8"
+    
+    # URL da Aba 1 (Datas e SLA) - Geralmente gid=0
+    url_p1 = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0"
+    # URL da Aba 2 (O que aparece no seu print: Parceiros, UF, Status)
+    # Nota: Você precisa verificar o número do GID na barra de endereços do navegador ao clicar na Página2
+    # Vou usar o padrão '1452934057' como exemplo, mas substitua pelo GID correto da aba Página2
+    url_p2 = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=1452934057"
+
+    # Lendo as duas abas
+    df1 = pd.read_csv(url_p1)
+    df2 = pd.read_csv(url_p2)
+
+    # Padronizando colunas da Aba 1
+    df1.columns = [
+        'Parceiros', 'Estado_Original', 'Primeiro Contato', 'Entrevista', 
         'Início Homologação', 'Processo Equatorial', 'Assinatura Contrato', 
         'Fim Homologação', 'SLA (dias)'
     ]
-    
+
+    # Cruzando os dados (Merge) com base no nome do Parceiro
+    # Isso traz a 'UF' e o 'Status' da Página 2 para dentro do dataframe principal
+    df = pd.merge(df1, df2, on='Parceiros', how='left')
+
     # Converter para datetime
     date_cols = ['Primeiro Contato', 'Entrevista', 'Início Homologação', 'Processo Equatorial', 'Assinatura Contrato', 'Fim Homologação']
     for col in date_cols:
         df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
-        
+
     return df
 
 df = load_data()
 
 # Lógica de Classificação da Situação (fase)
-def get_phase(row):
+def get_phase_integrated(row):
+    if pd.notnull(row['Status']): # Se o status da Página 2 estiver preenchido, ele tem prioridade
+        return row['Status']
     if pd.notnull(row['Fim Homologação']):
         return "Homologado"
-    if pd.notnull(row['Início Homologação']) or pd.notnull(row['Processo Equatorial']):
-        return "Em Homologação"
-    if pd.notnull(row['Entrevista']):
-        return "Em Análise"
-    if pd.notnull(row['Primeiro Contato']):
-        return "Parceiro - documentação"
-    return "Sem Contato"
+    return "Em Análise"
 
-df['Fase'] = df.apply(get_phase, axis=1)
+df['Fase'] = df.apply(get_phase_integrated, axis=1)
 
 def get_etapa_atual(row):
     if pd.notnull(row['Fim Homologação']):
