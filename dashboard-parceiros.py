@@ -45,11 +45,26 @@ df = load_data()
 
 # Lógica de Classificação da Situação (fase)
 def get_phase_integrated(row):
-    if pd.notnull(row['Status']): # Se o status da Página 2 estiver preenchido, ele tem prioridade
+    # 1. PRIORIDADE MÁXIMA: Status manual da Página 2 (ex: Echo, Homologado, Análise)
+    # Se você escreveu algo no print que enviou, o sistema obedece cegamente.
+    if pd.notnull(row['Status']):
         return row['Status']
+    
+    # 2. SEGUNDA PRIORIDADE: Verificação automática por datas
     if pd.notnull(row['Fim Homologação']):
         return "Homologado"
-    return "Em Análise"
+    
+    if pd.notnull(row['Início Homologação']):
+        return "Em Homologação"
+    
+    if pd.notnull(row['Entrevista']):
+        return "Em Análise" # Ou "Em Entrevista", como preferir
+        
+    if pd.notnull(row['Primeiro Contato']):
+        return "Parceiro - documentação"
+    
+    # 3. SE NÃO TIVER NADA: O parceiro ainda não entrou no fluxo
+    return "Sem Contato"
 
 df['Fase'] = df.apply(get_phase_integrated, axis=1)
 
