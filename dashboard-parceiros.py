@@ -5,33 +5,20 @@ from datetime import datetime
 import numpy as np
 
 # Configurar layout da página
-st.set_page_config(layout="wide", page_title="Dashboard de Parceiros Integrado")
+st.set_page_config(layout="wide", page_title="Dashboard de Parceiros")
 
 @st.cache_data
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1ncUO3qsAr8edPs3Cee_H4kFcwvZc4yTGV1tlVq5zXV8/export?format=csv"
     df = pd.read_csv(url)
-    
-    # Remove any trailing empty columns
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    
-    # Strip whitespace from column names
-    df.columns = [col.strip() for col in df.columns]
-    
-    expected_columns = [
+    # Renomear colunas para evitar problemas de codificação
+    df.columns = [
         'Parceiros', 'Estado', 'Primeiro Contato', 'Entrevista', 
         'Início Homologação', 'Processo Equatorial', 'Assinatura Contrato', 
         'Fim Homologação', 'SLA (dias)'
     ]
     
-    # Check if we have the right number of columns
-    if len(df.columns) != len(expected_columns):
-        st.error(f"Column count mismatch. Expected {len(expected_columns)}, got {len(df.columns)}")
-        st.error(f"Actual columns: {list(df.columns)}")
-        return pd.DataFrame()
-    
-    df.columns = expected_columns
-    
+    # Converter para datetime
     date_cols = ['Primeiro Contato', 'Entrevista', 'Início Homologação', 'Processo Equatorial', 'Assinatura Contrato', 'Fim Homologação']
     for col in date_cols:
         df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
@@ -40,33 +27,19 @@ def load_data():
 
 df = load_data()
 
-if df.empty:
-    st.stop()
-
 # Lógica de Classificação da Situação (fase)
-def get_phase_integrated(row):
-    # 1. PRIORIDADE MÁXIMA: Status manual da Página 2 (ex: Echo, Homologado, Análise)
-    # Se você escreveu algo no print que enviou, o sistema obedece cegamente.
-    if pd.notnull(row['Status']):
-        return row['Status']
-    
-    # 2. SEGUNDA PRIORIDADE: Verificação automática por datas
+def get_phase(row):
     if pd.notnull(row['Fim Homologação']):
         return "Homologado"
-    
-    if pd.notnull(row['Início Homologação']):
+    if pd.notnull(row['Início Homologação']) or pd.notnull(row['Processo Equatorial']):
         return "Em Homologação"
-    
     if pd.notnull(row['Entrevista']):
-        return "Em Análise" # Ou "Em Entrevista", como preferir
-        
+        return "Em Análise"
     if pd.notnull(row['Primeiro Contato']):
         return "Parceiro - documentação"
-    
-    # 3. SE NÃO TIVER NADA: O parceiro ainda não entrou no fluxo
     return "Sem Contato"
 
-df['Fase'] = df.apply(get_phase_integrated, axis=1)
+df['Fase'] = df.apply(get_phase, axis=1)
 
 def get_etapa_atual(row):
     if pd.notnull(row['Fim Homologação']):
