@@ -11,14 +11,27 @@ st.set_page_config(layout="wide", page_title="Dashboard de Parceiros")
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1ncUO3qsAr8edPs3Cee_H4kFcwvZc4yTGV1tlVq5zXV8/export?format=csv"
     df = pd.read_csv(url)
-    # Renomear colunas para evitar problemas de codificação
-    df.columns = [
+    
+    # Remove any trailing empty columns
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    
+    # Strip whitespace from column names
+    df.columns = [col.strip() for col in df.columns]
+    
+    expected_columns = [
         'Parceiros', 'Estado', 'Primeiro Contato', 'Entrevista', 
         'Início Homologação', 'Processo Equatorial', 'Assinatura Contrato', 
         'Fim Homologação', 'SLA (dias)'
     ]
     
-    # Converter para datetime
+    # Check if we have the right number of columns
+    if len(df.columns) != len(expected_columns):
+        st.error(f"Column count mismatch. Expected {len(expected_columns)}, got {len(df.columns)}")
+        st.error(f"Actual columns: {list(df.columns)}")
+        return pd.DataFrame()
+    
+    df.columns = expected_columns
+    
     date_cols = ['Primeiro Contato', 'Entrevista', 'Início Homologação', 'Processo Equatorial', 'Assinatura Contrato', 'Fim Homologação']
     for col in date_cols:
         df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')
@@ -26,6 +39,9 @@ def load_data():
     return df
 
 df = load_data()
+
+if df.empty:
+    st.stop()
 
 # Lógica de Classificação da Situação (fase)
 def get_phase(row):
